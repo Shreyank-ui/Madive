@@ -29,7 +29,7 @@ export default function PatientDashboard() {
   const load = useCallback(async () => {
     if (!user) {
     setLoading(false);
-    navigate("/login", { replace: true });
+   
     return;
   }
     try {
