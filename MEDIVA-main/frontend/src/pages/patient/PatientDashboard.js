@@ -27,7 +27,11 @@ export default function PatientDashboard() {
   const [patientProfile, setPatientProfile] = useState(null);
 
   const load = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+    setLoading(false);
+    navigate("/login", { replace: true });
+    return;
+  }
     try {
       const [ehrRow, pProfile] = await Promise.all([
         getLatestEhrForPatient(user.id),
