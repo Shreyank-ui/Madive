@@ -15,10 +15,11 @@ function App() {
       <AuthProvider>
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Navigate to="/patient/dashboard" replace />} />
-            <Route path="/patient/dashboard" element={<PatientDashboard />} />
-            <Route path="/doctor/dashboard" element={<DoctorDashboard />} />
-            <Route path="*" element={<Navigate to="/patient/dashboard" replace />} />
+            <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/patient/dashboard" element={<PatientDashboard />} />
+        <Route path="/doctor/dashboard" element={<DoctorDashboard />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
           <Toaster position="top-center" richColors />
         </BrowserRouter>
