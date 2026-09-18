@@ -123,16 +123,15 @@ function PatientPanel({ navigate }) {
   const [loading, setLoading] = useState(false);
   const [demoLoading, setDemoLoading] = useState(false);
 
-  async function handleSend(e) {
+async function handleSend(e) {
     e.preventDefault();
     if (!email.trim()) return toast.error("Please enter your email.");
     setLoading(true);
     try {
-      await sendPatientOtp(email);
-      toast.success("Verification code sent to your email");
-      setStep("otp");
+      await sendPatientOtp(email, { full_name: fullName });
+      navigate("/patient/dashboard");
     } catch (err) {
-      toast.error(err.message || "Could not send code");
+      toast.error(err?.message || "Login failed.");
     } finally {
       setLoading(false);
     }

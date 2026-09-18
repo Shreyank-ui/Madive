@@ -47,14 +47,31 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  // ----- Patient: email OTP -----
-  async function sendPatientOtp(email) {
-    const { error } = await supabase.auth.signInWithOtp({
-      email: (email || "").trim(),
-      options: { shouldCreateUser: true },
+
+// ----- Patient: direct sign-in bypass (no OTP needed) -----
+  async function sendPatientOtp(email, extra = {}) {
+    const cleanEmail = (email || "").trim();
+    const demoPassword = "MedivaPatient2026!";
+
+    // 1. Try to log in with preset password
+    let { error } = await supabase.auth.signInWithPassword({
+      email: cleanEmail,
+      password: demoPassword,
     });
-    if (error) throw error;
-    return true;
+
+    // 2. If the user doesn't exist, create the account
+    if (error) {
+      const { error: signUpError } = await supabase.auth.signUp({
+        email: cleanEmail,
+        password: demoPassword,
+      });
+      if (signUpError) throw signUpError;
+    }
+
+    // 3. Attach patient profile and set session state
+    const profile = await ensurePatientProfile(extra);
+    setUser(profile);
+    return profile;
   }
 
   async function verifyPatientOtp(email, token, extra = {}) {
