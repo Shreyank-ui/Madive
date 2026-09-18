@@ -102,34 +102,58 @@ export function AuthProvider({ children }) {
     return profile;
   }
 
-  async function signupDoctor(profileData, password) {
+async function signupDoctor(profileData, password) {
+    const cleanEmail = (profileData.email || "").trim();
     const { data, error } = await supabase.auth.signUp({
-      email: (profileData.email || "").trim(),
+      email: cleanEmail,
       password,
     });
     if (error) throw new Error(mapAuthError(error));
+
     if (!data.session) {
-      throw new Error(
-        "Account created, but email confirmation is required. Please disable 'Confirm email' in Supabase Auth settings for this demo, or confirm via the email link."
-      );
+      await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password,
+      });
     }
+
     const profile = await createDoctorProfileForSession(profileData);
     setUser(profile);
     return profile;
   }
 
-  // ----- Dev/demo bypass: password sign-in for seeded accounts (testing) -----
+  // ----- Dev/demo bypass: auto-provision demo accounts -----
   async function devLogin(email, password) {
-    const { error } = await supabase.auth.signInWithPassword({
-      email: (email || "").trim(),
+    const cleanEmail = (email || "").trim();
+    let { error } = await supabase.auth.signInWithPassword({
+      email: cleanEmail,
       password,
     });
-    if (error) throw new Error(mapAuthError(error));
-    const profile = await getMyProfile();
-    if (!profile) {
-      await supabase.auth.signOut();
-      throw new Error("No profile linked to this account.");
+
+    // If the account does not exist yet, create it immediately
+    if (error) {
+      const { error: signUpError } = await supabase.auth.signUp({
+        email: cleanEmail,
+        password,
+      });
+      if (signUpError) throw new Error(mapAuthError(signUpError));
     }
+
+    let profile = await getMyProfile();
+    if (!profile) {
+      if (cleanEmail.toLowerCase().includes("doctor")) {
+        profile = await createDoctorProfileForSession({
+          full_name: "Dr. Demo",
+          specialty: "Clinical Specialist",
+          email: cleanEmail,
+        });
+      } else {
+        profile = await ensurePatientProfile({
+          full_name: "Demo Patient",
+        });
+      }
+    }
+
     setUser(profile);
     return profile;
   }
