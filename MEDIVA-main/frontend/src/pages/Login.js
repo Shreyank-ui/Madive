@@ -115,140 +115,75 @@ function DevLoginButton({ onClick, loading, label, testid }) {
 }
 
 function PatientPanel({ navigate }) {
-  const { sendPatientOtp, verifyPatientOtp, devLogin } = useAuth();
-  const [step, setStep] = useState("email");
-  const [email, setEmail] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [code, setCode] = useState("");
+  // Use your new password login method from AuthContext here
+  const { loginPatient, devLogin } = useAuth(); 
   const [loading, setLoading] = useState(false);
   const [demoLoading, setDemoLoading] = useState(false);
+  const [creds, setCreds] = useState({ identifier: "", password: "" });
 
-async function handleSend(e) {
+  async function handleLogin(e) {
     e.preventDefault();
-    if (!email.trim()) return toast.error("Please enter your email.");
+    if (!creds.identifier.trim() || !creds.password.trim()) {
+      return toast.error("Please enter both ID/Email and password.");
+    }
+    
     setLoading(true);
     try {
-      await sendPatientOtp(email, { full_name: fullName });
-      navigate("/patient/dashboard");
-    } catch (err) {
-      toast.error(err?.message || "Login failed.");
-    } finally {
-      setLoading(false);
-    }
-  }
+      console.log("Submitting login for:", creds.identifier);
+      const res = await loginPatient(creds.identifier, creds.password);
+      console.log("Login response:", res);
 
-  async function handleVerify(e) {
-    e.preventDefault();
-    if (!code.trim()) return toast.error("Enter the code from your email.");
-    setLoading(true);
-    try {
-      await verifyPatientOtp(email, code, { full_name: fullName });
-      toast.success("Signed in!");
+      toast.success("Welcome back!");
       navigate("/patient/dashboard", { replace: true });
     } catch (err) {
-      toast.error(err.message || "Invalid or expired code");
+      console.error("Login caught error:", err);
+      toast.error(err.message || "Invalid credentials");
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function handleDemo() {
-    setDemoLoading(true);
-    try {
-      await devLogin(DEMO.patient.email, DEMO.patient.password);
-      toast.success("Signed in as demo patient");
-      navigate("/patient/dashboard", { replace: true });
-    } catch (err) {
-      toast.error(err.message || "Demo login unavailable");
-    } finally {
-      setDemoLoading(false);
     }
   }
 
   return (
     <Panel>
-      {step === "email" ? (
-        <form onSubmit={handleSend} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="p-name">Full name (new patients)</Label>
+      <form onSubmit={handleLogin} className="space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="p-id">User ID or Email</Label>
+          <div className="relative">
+            <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <Input
-              id="p-name"
-              data-testid="patient-fullname"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              placeholder="Aarav Sharma"
-              className="h-11"
+              id="p-id"
+              type="text"
+              value={creds.identifier}
+              onChange={(e) => setCreds({ ...creds, identifier: e.target.value })}
+              placeholder="patient@mediva.ai or User ID"
+              className="h-11 pl-9"
             />
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="p-email">Email</Label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input
-                id="p-email"
-                type="email"
-                data-testid="patient-otp-email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@email.com"
-                className="h-11 pl-9"
-              />
-            </div>
-            <p className="text-xs text-slate-400">
-              We'll email you a one-time verification code.
-            </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="p-pass">Password</Label>
+          <div className="relative">
+            <KeyRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Input
+              id="p-pass"
+              type="password"
+              value={creds.password}
+              onChange={(e) => setCreds({ ...creds, password: e.target.value })}
+              placeholder="••••••••"
+              className="h-11 pl-9"
+            />
           </div>
-          <Button
-            type="submit"
-            disabled={loading}
-            data-testid="patient-send-otp"
-            className="h-11 w-full bg-sky-600 hover:bg-sky-700"
-          >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send Verification Code"}
-          </Button>
-          <DevLoginButton
-            onClick={handleDemo}
-            loading={demoLoading}
-            label="Continue as Demo Patient"
-            testid="patient-demo-login"
-          />
-        </form>
-      ) : (
-        <form onSubmit={handleVerify} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="p-code">Enter the 6-digit code</Label>
-            <div className="relative">
-              <KeyRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input
-                id="p-code"
-                inputMode="numeric"
-                maxLength={6}
-                data-testid="patient-otp-code"
-                value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                placeholder="••••••"
-                className="h-11 pl-9 tracking-[0.5em]"
-              />
-            </div>
-            <p className="text-xs text-slate-400">Sent to {email}</p>
-          </div>
-          <Button
-            type="submit"
-            disabled={loading}
-            data-testid="patient-verify-otp"
-            className="h-11 w-full bg-sky-600 hover:bg-sky-700"
-          >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify & Continue"}
-          </Button>
-          <button
-            type="button"
-            onClick={() => setStep("email")}
-            className="w-full text-center text-sm font-medium text-sky-600 hover:underline"
-          >
-            Use a different email
-          </button>
-        </form>
-      )}
+        </div>
+
+        <Button
+          type="submit"
+          disabled={loading}
+          className="h-11 w-full bg-sky-600 hover:bg-sky-700"
+        >
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sign In"}
+        </Button>
+      </form>
     </Panel>
   );
 }
