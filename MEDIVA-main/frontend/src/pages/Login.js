@@ -116,7 +116,8 @@ function DevLoginButton({ onClick, loading, label, testid }) {
 
 
 export function PatientPanel({ navigate: navigateProp }) {
-  const navigate = navigateProp || useNavigate();
+  const defaultNavigate = useNavigate();
+  const navigate = navigateProp || defaultNavigate;
   const { sendPatientOtp, devLogin } = useAuth();
 
   const [mode, setMode] = useState('login'); // 'login' or 'signup'
