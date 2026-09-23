@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { toast } from "sonner";
-import { User, Stethoscope, ArrowRight, Loader2, Mail, KeyRound, Zap,Lock} from "lucide-react";
+import { User, Stethoscope, ArrowRight, Loader2, Mail, KeyRound, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -115,24 +115,19 @@ function DevLoginButton({ onClick, loading, label, testid }) {
 }
 
 
-export function PatientPanel(props) {
-  // Safe navigation fallback: use prop if passed, otherwise hook, otherwise browser redirect
-  const navigateHook = useNavigate();
-  const navigate = props.navigate || navigateHook || ((url) => { window.location.href = url; });
-
-  // Safe auth context fallback
-  const auth = useAuth() || {};
+export function PatientPanel({ navigate: navigateProp }) {
+  const navigate = navigateProp || useNavigate();
+  const { sendPatientOtp, devLogin } = useAuth();
 
   const [mode, setMode] = useState('login'); // 'login' or 'signup'
   const [loading, setLoading] = useState(false);
   const [demoLoading, setDemoLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Form State (User ID & Password)
+  // Form State
   const [formData, setFormData] = useState({
-    userId: '',
-    fullName: '',
     email: '',
+    fullName: '',
     password: ''
   });
 
@@ -144,30 +139,18 @@ export function PatientPanel(props) {
   };
 
   // Standard Form Submit (Sign In / Sign Up)
+  // sendPatientOtp handles both: it tries signInWithPassword, and if the
+  // account doesn't exist it auto-creates one, then attaches a patient profile.
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
-      if (mode === 'signup') {
-        if (typeof auth.signupPatient === 'function') {
-          await auth.signupPatient(formData);
-        } else if (typeof auth.signup === 'function') {
-          await auth.signup({ ...formData, role: 'patient' });
-        }
-      } else {
-        if (typeof auth.loginPatient === 'function') {
-          await auth.loginPatient(formData.userId, formData.password);
-        } else if (typeof auth.login === 'function') {
-          await auth.login({ userId: formData.userId, password: formData.password, role: 'patient' });
-        }
-      }
-
-      // Redirect upon success
-      if (typeof navigate === 'function') {
-        navigate('/patient/dashboard');
-      }
+      const extra = mode === 'signup' ? { full_name: formData.fullName } : {};
+      await sendPatientOtp(formData.email, extra);
+      toast.success(mode === 'signup' ? 'Account created!' : 'Welcome back!');
+      navigate('/patient/dashboard', { replace: true });
     } catch (err) {
       console.error('Authentication error:', err);
       setError(err?.message || 'Login failed. Please check your credentials.');
@@ -182,17 +165,9 @@ export function PatientPanel(props) {
     setDemoLoading(true);
 
     try {
-      if (typeof auth.demoLoginPatient === 'function') {
-        await auth.demoLoginPatient();
-      } else if (typeof auth.loginPatient === 'function') {
-        await auth.loginPatient('patient_demo', 'demo123');
-      } else if (typeof auth.login === 'function') {
-        await auth.login({ userId: 'patient_demo', password: 'demo123', role: 'patient' });
-      }
-
-      if (typeof navigate === 'function') {
-        navigate('/patient/dashboard');
-      }
+      await devLogin(DEMO.patient.email, DEMO.patient.password);
+      toast.success('Signed in as demo patient');
+      navigate('/patient/dashboard', { replace: true });
     } catch (err) {
       console.error('Demo login error:', err);
       setError('Could not log in as demo patient. Check server connection.');
@@ -202,16 +177,16 @@ export function PatientPanel(props) {
   };
 
   return (
-    <div className="w-full max-w-md mx-auto space-y-4">
+    <Panel>
       {/* Mode Switcher Tabs */}
-      <div className="flex rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
+      <div className="flex rounded-lg bg-gray-100 p-1 mb-4">
         <button
           type="button"
           onClick={() => { setMode('login'); setError(''); }}
           className={`w-1/2 py-2 text-sm font-medium rounded-md transition-colors ${
             mode === 'login'
-              ? 'bg-white text-gray-900 shadow dark:bg-gray-700 dark:text-white'
-              : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
+              ? 'bg-white text-gray-900 shadow'
+              : 'text-gray-500 hover:text-gray-700'
           }`}
         >
           Sign In
@@ -221,8 +196,8 @@ export function PatientPanel(props) {
           onClick={() => { setMode('signup'); setError(''); }}
           className={`w-1/2 py-2 text-sm font-medium rounded-md transition-colors ${
             mode === 'signup'
-              ? 'bg-white text-gray-900 shadow dark:bg-gray-700 dark:text-white'
-              : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
+              ? 'bg-white text-gray-900 shadow'
+              : 'text-gray-500 hover:text-gray-700'
           }`}
         >
           Sign Up
@@ -231,7 +206,7 @@ export function PatientPanel(props) {
 
       {/* Error Message */}
       {error && (
-        <div className="p-3 text-sm text-red-600 bg-red-50 rounded-lg dark:bg-red-950 dark:text-red-300">
+        <div className="mb-3 p-3 text-sm text-red-600 bg-red-50 rounded-lg">
           {error}
         </div>
       )}
@@ -239,118 +214,67 @@ export function PatientPanel(props) {
       {/* Main Form */}
       <form onSubmit={handleSubmit} className="space-y-3">
         {mode === 'signup' && (
-          <>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Full Name
-              </label>
-              <div className="relative">
-                <User className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  name="fullName"
-                  required
-                  value={formData.fullName}
-                  onChange={handleChange}
-                  placeholder="e.g. Rahul Sharma"
-                  className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700"
-                />
-              </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="p-name">Full Name</Label>
+            <div className="relative">
+              <User className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+              <Input
+                id="p-name"
+                type="text"
+                name="fullName"
+                required
+                value={formData.fullName}
+                onChange={handleChange}
+                placeholder="e.g. Rahul Sharma"
+                className="h-11 pl-9"
+              />
             </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Email Address
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                <input
-                  type="email"
-                  name="email"
-                  required
-                  value={formData.email}
-                  onChange={handleChange}
-                  placeholder="patient@example.com"
-                  className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700"
-                />
-              </div>
-            </div>
-          </>
+          </div>
         )}
 
-        <div>
-          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-            User ID / Patient ID
-          </label>
+        <div className="space-y-1.5">
+          <Label htmlFor="p-email">Email Address</Label>
           <div className="relative">
-            <User className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-            <input
-              type="text"
-              name="userId"
+            <Mail className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+            <Input
+              id="p-email"
+              type="email"
+              name="email"
               required
-              value={formData.userId}
+              data-testid="patient-login-email"
+              value={formData.email}
               onChange={handleChange}
-              placeholder="Enter your Patient ID"
-              className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700"
+              placeholder="patient@example.com"
+              className="h-11 pl-9"
             />
           </div>
         </div>
 
-        <div>
-          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Password
-          </label>
-          <div className="relative">
-            <Lock className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-            <input
-              type="password"
-              name="password"
-              required
-              value={formData.password}
-              onChange={handleChange}
-              placeholder="••••••••"
-              className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700"
-            />
-          </div>
-        </div>
-
-        <button
+        <Button
           type="submit"
           disabled={loading || demoLoading}
-          className="w-full h-11 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-sm transition-colors disabled:opacity-50"
+          data-testid="patient-login-submit"
+          className="h-11 w-full bg-sky-600 hover:bg-sky-700"
         >
           {loading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <>
               {mode === 'login' ? 'Sign In as Patient' : 'Create Patient Account'}
-              <ArrowRight className="h-4 w-4" />
+              <ArrowRight className="ml-2 h-4 w-4" />
             </>
           )}
-        </button>
+        </Button>
       </form>
 
-      {/* Divider */}
-      <div className="relative flex py-1 items-center">
-        <div className="flex-grow border-t border-gray-200 dark:border-gray-700"></div>
-        <span className="flex-shrink mx-3 text-xs text-gray-400 uppercase">Or</span>
-        <div className="flex-grow border-t border-gray-200 dark:border-gray-700"></div>
-      </div>
-
       {/* Demo Patient Quick-Login */}
-      <button
-        type="button"
+      <DevLoginButton
         onClick={handleDemoPatient}
-        disabled={loading || demoLoading}
-        className="w-full h-10 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200 font-medium rounded-lg text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
-      >
-        {demoLoading ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          'Try as Demo Patient'
-        )}
-      </button>
-    </div>
+        loading={demoLoading}
+        label="Continue as Demo Patient"
+        testid="patient-demo-login"
+      />
+    </Panel>
   );
 }
 
