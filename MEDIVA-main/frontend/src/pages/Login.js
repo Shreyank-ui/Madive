@@ -114,142 +114,247 @@ function DevLoginButton({ onClick, loading, label, testid }) {
   );
 }
 
-function PatientPanel({ navigate }) {
-  const { sendPatientOtp, verifyPatientOtp, devLogin } = useAuth();
-  const [step, setStep] = useState("email");
-  const [email, setEmail] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [code, setCode] = useState("");
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { Loader2, User, Lock, Mail, ArrowRight } from 'lucide-react';
+
+export function PatientPanel(props) {
+  // Safe navigation fallback: use prop if passed, otherwise hook, otherwise browser redirect
+  const navigateHook = useNavigate();
+  const navigate = props.navigate || navigateHook || ((url) => { window.location.href = url; });
+
+  // Safe auth context fallback
+  const auth = useAuth() || {};
+
+  const [mode, setMode] = useState('login'); // 'login' or 'signup'
   const [loading, setLoading] = useState(false);
   const [demoLoading, setDemoLoading] = useState(false);
+  const [error, setError] = useState('');
 
-async function handleSend(e) {
+  // Form State (User ID & Password)
+  const [formData, setFormData] = useState({
+    userId: '',
+    fullName: '',
+    email: '',
+    password: ''
+  });
+
+  const handleChange = (e) => {
+    setFormData((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value
+    }));
+  };
+
+  // Standard Form Submit (Sign In / Sign Up)
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!email.trim()) return toast.error("Please enter your email.");
+    setError('');
     setLoading(true);
+
     try {
-      await sendPatientOtp(email, { full_name: fullName });
-      navigate("/patient/dashboard");
+      if (mode === 'signup') {
+        if (typeof auth.signupPatient === 'function') {
+          await auth.signupPatient(formData);
+        } else if (typeof auth.signup === 'function') {
+          await auth.signup({ ...formData, role: 'patient' });
+        }
+      } else {
+        if (typeof auth.loginPatient === 'function') {
+          await auth.loginPatient(formData.userId, formData.password);
+        } else if (typeof auth.login === 'function') {
+          await auth.login({ userId: formData.userId, password: formData.password, role: 'patient' });
+        }
+      }
+
+      // Redirect upon success
+      if (typeof navigate === 'function') {
+        navigate('/patient/dashboard');
+      }
     } catch (err) {
-      toast.error(err?.message || "Login failed.");
+      console.error('Authentication error:', err);
+      setError(err?.message || 'Login failed. Please check your credentials.');
     } finally {
       setLoading(false);
     }
-  }
+  };
 
-  async function handleVerify(e) {
-    e.preventDefault();
-    if (!code.trim()) return toast.error("Enter the code from your email.");
-    setLoading(true);
-    try {
-      await verifyPatientOtp(email, code, { full_name: fullName });
-      toast.success("Signed in!");
-      navigate("/patient/dashboard", { replace: true });
-    } catch (err) {
-      toast.error(err.message || "Invalid or expired code");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleDemo() {
+  // One-Click Demo Patient Login
+  const handleDemoPatient = async () => {
+    setError('');
     setDemoLoading(true);
+
     try {
-      await devLogin(DEMO.patient.email, DEMO.patient.password);
-      toast.success("Signed in as demo patient");
-      navigate("/patient/dashboard", { replace: true });
+      if (typeof auth.demoLoginPatient === 'function') {
+        await auth.demoLoginPatient();
+      } else if (typeof auth.loginPatient === 'function') {
+        await auth.loginPatient('patient_demo', 'demo123');
+      } else if (typeof auth.login === 'function') {
+        await auth.login({ userId: 'patient_demo', password: 'demo123', role: 'patient' });
+      }
+
+      if (typeof navigate === 'function') {
+        navigate('/patient/dashboard');
+      }
     } catch (err) {
-      toast.error(err.message || "Demo login unavailable");
+      console.error('Demo login error:', err);
+      setError('Could not log in as demo patient. Check server connection.');
     } finally {
       setDemoLoading(false);
     }
-  }
+  };
 
   return (
-    <Panel>
-      {step === "email" ? (
-        <form onSubmit={handleSend} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="p-name">Full name (new patients)</Label>
-            <Input
-              id="p-name"
-              data-testid="patient-fullname"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              placeholder="Aarav Sharma"
-              className="h-11"
+    <div className="w-full max-w-md mx-auto space-y-4">
+      {/* Mode Switcher Tabs */}
+      <div className="flex rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
+        <button
+          type="button"
+          onClick={() => { setMode('login'); setError(''); }}
+          className={`w-1/2 py-2 text-sm font-medium rounded-md transition-colors ${
+            mode === 'login'
+              ? 'bg-white text-gray-900 shadow dark:bg-gray-700 dark:text-white'
+              : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
+          }`}
+        >
+          Sign In
+        </button>
+        <button
+          type="button"
+          onClick={() => { setMode('signup'); setError(''); }}
+          className={`w-1/2 py-2 text-sm font-medium rounded-md transition-colors ${
+            mode === 'signup'
+              ? 'bg-white text-gray-900 shadow dark:bg-gray-700 dark:text-white'
+              : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
+          }`}
+        >
+          Sign Up
+        </button>
+      </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="p-3 text-sm text-red-600 bg-red-50 rounded-lg dark:bg-red-950 dark:text-red-300">
+          {error}
+        </div>
+      )}
+
+      {/* Main Form */}
+      <form onSubmit={handleSubmit} className="space-y-3">
+        {mode === 'signup' && (
+          <>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Full Name
+              </label>
+              <div className="relative">
+                <User className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  name="fullName"
+                  required
+                  value={formData.fullName}
+                  onChange={handleChange}
+                  placeholder="e.g. Rahul Sharma"
+                  className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Email Address
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                <input
+                  type="email"
+                  name="email"
+                  required
+                  value={formData.email}
+                  onChange={handleChange}
+                  placeholder="patient@example.com"
+                  className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700"
+                />
+              </div>
+            </div>
+          </>
+        )}
+
+        <div>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+            User ID / Patient ID
+          </label>
+          <div className="relative">
+            <User className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              name="userId"
+              required
+              value={formData.userId}
+              onChange={handleChange}
+              placeholder="Enter your Patient ID"
+              className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700"
             />
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="p-email">Email</Label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input
-                id="p-email"
-                type="email"
-                data-testid="patient-otp-email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@email.com"
-                className="h-11 pl-9"
-              />
-            </div>
-            <p className="text-xs text-slate-400">
-              We'll email you a one-time verification code.
-            </p>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Password
+          </label>
+          <div className="relative">
+            <Lock className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+            <input
+              type="password"
+              name="password"
+              required
+              value={formData.password}
+              onChange={handleChange}
+              placeholder="••••••••"
+              className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700"
+            />
           </div>
-          <Button
-            type="submit"
-            disabled={loading}
-            data-testid="patient-send-otp"
-            className="h-11 w-full bg-sky-600 hover:bg-sky-700"
-          >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send Verification Code"}
-          </Button>
-          <DevLoginButton
-            onClick={handleDemo}
-            loading={demoLoading}
-            label="Continue as Demo Patient"
-            testid="patient-demo-login"
-          />
-        </form>
-      ) : (
-        <form onSubmit={handleVerify} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="p-code">Enter the 6-digit code</Label>
-            <div className="relative">
-              <KeyRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input
-                id="p-code"
-                inputMode="numeric"
-                maxLength={6}
-                data-testid="patient-otp-code"
-                value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                placeholder="••••••"
-                className="h-11 pl-9 tracking-[0.5em]"
-              />
-            </div>
-            <p className="text-xs text-slate-400">Sent to {email}</p>
-          </div>
-          <Button
-            type="submit"
-            disabled={loading}
-            data-testid="patient-verify-otp"
-            className="h-11 w-full bg-sky-600 hover:bg-sky-700"
-          >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify & Continue"}
-          </Button>
-          <button
-            type="button"
-            onClick={() => setStep("email")}
-            className="w-full text-center text-sm font-medium text-sky-600 hover:underline"
-          >
-            Use a different email
-          </button>
-        </form>
-      )}
-    </Panel>
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading || demoLoading}
+          className="w-full h-11 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-sm transition-colors disabled:opacity-50"
+        >
+          {loading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <>
+              {mode === 'login' ? 'Sign In as Patient' : 'Create Patient Account'}
+              <ArrowRight className="h-4 w-4" />
+            </>
+          )}
+        </button>
+      </form>
+
+      {/* Divider */}
+      <div className="relative flex py-1 items-center">
+        <div className="flex-grow border-t border-gray-200 dark:border-gray-700"></div>
+        <span className="flex-shrink mx-3 text-xs text-gray-400 uppercase">Or</span>
+        <div className="flex-grow border-t border-gray-200 dark:border-gray-700"></div>
+      </div>
+
+      {/* Demo Patient Quick-Login */}
+      <button
+        type="button"
+        onClick={handleDemoPatient}
+        disabled={loading || demoLoading}
+        className="w-full h-10 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200 font-medium rounded-lg text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+      >
+        {demoLoading ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          'Try as Demo Patient'
+        )}
+      </button>
+    </div>
   );
 }
 
