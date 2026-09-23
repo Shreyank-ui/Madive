@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { toast } from "sonner";
-import { User, Stethoscope, ArrowRight, Loader2, Mail, KeyRound, Zap } from "lucide-react";
+import { User, Stethoscope, ArrowRight, Loader2, Mail, KeyRound, Zap,Lock} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -114,10 +114,6 @@ function DevLoginButton({ onClick, loading, label, testid }) {
   );
 }
 
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { Loader2, User, Lock, Mail, ArrowRight } from 'lucide-react';
 
 export function PatientPanel(props) {
   // Safe navigation fallback: use prop if passed, otherwise hook, otherwise browser redirect
